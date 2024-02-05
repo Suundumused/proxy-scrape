@@ -105,3 +105,7 @@ Exemplo de uso:
 ---
 
     resp = self.sess.get('https://....', timeout=5, proxies=proxies, verify=self.certificate)
+
+### Support
+**BTC**: `bc1qa0xzyhcmcsuvppttmylzygwwfaken5jturhgek`
+**ETH**: `0x2fA70716D1Ae2f4994Be8e249b609056D72Ce80a`
