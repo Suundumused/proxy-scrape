@@ -1,10 +1,10 @@
 ﻿# Proxy Scrape
-Projeto para receber, validar e armazenar uma lista de proxies gratuitos.
+Project to receive, validate and store a list of free proxies.
 
-# Instação
+# Installation
  - `pip install -r .../Requirements.txt`
 
-# Requisitos
+# Requirements
  - argparse
  - urllib3 
  - requests
@@ -14,8 +14,8 @@ Projeto para receber, validar e armazenar uma lista de proxies gratuitos.
  - proxies_validator.py
  - custom_arg_types.py
 
-## Utilização 
-Esta linhas iniciais são necessárias em proxy_scrape.py para a funcionalidade básica.
+## Usage 
+These initial lines are required in proxy_scrape.py for basic functionality.
 
     import argparse
     import csv
@@ -28,41 +28,41 @@ Esta linhas iniciais são necessárias em proxy_scrape.py para a funcionalidade 
     from proxies_validator import test_servers
     from custom_arg_types import str_bool_switcher_type, tuple_type
 ----
-A Instância recebe inicialmente os argumentos: 
+The Instance initially receives the arguments:
 
- - `-pem` Caminho do arquivo certificado arquivo.pem
- - `-to` Intervalo de tempo para teste de cada servidor proxy.
+ - `-pem` Certificate file path file.pem
+ - `-to` Time interval for testing each proxy server.
 ---
 
     client = ProxyReceiver(args.certificate, args.time_out)
 
-## Argumentos gerais
+## Overall arguments
 
- - `-p` Recebe uma tupla de protocolos desejados para busca de servidores proxy ex: --protocols 'https', 'socks5'
- - `-l` Limite de proxies testados e válidos por protocolo.
- - `-url` URL da API que terá a lista de servidores proxy IP:PORTA, o parâmetro {{protocol_value}} é obrigatório após a variável protocol= ou qualquer variável de referência a tipo de protocolo.
- - `-out` É a pasta de saída que terá o arquivo csv com a lista proxy testados.
+ - `-p` Receives a tuple of desired protocols for proxy server search eg: --protocols 'https', 'socks5'
+ - `-l` Limit of tested and valid proxies per protocol.
+ - `-url` API URL that will have the list of IP:PORT proxy servers, the {{protocol_value}} parameter is mandatory after the protocol= variable or any protocol type reference variable.
+ - `-out` It is the output folder that will have the csv file with the tested proxy list.
 
-## Funções
+## Functions
 
     content = client.retrieve_free_proxy_list(args.link, protocol)
     
 
- - Recebe a lista de servidores proxy da API-URL com todos os protocolos selecionados em string.
+ - Receives the list of API-URL proxy servers with all protocols selected in string.
 
 ---
 
     client.write_valid_list(content, protocol, args.output_folder, args.limit)
 
- - Testa, valida(test_servers(...)) e salva o ip:porta e protocolo em um arquivo csv.
+ - Test, validate (test_servers(...)) and save the ip:port and protocol in a csv file.
  ---
 
     test_servers(protocol, row, self.sess, self.certificate, self.old_ip)
      
- - Função individual que testa a conexão com o servidor e valida a filtragem do IP.
+ - Individual function that tests the connection to the server and validates IP filtering.
 
 
-## Estrutura do csv
+## csv structure
 
 |    url          |port                          |protocol                         |
 |----------------|-------------------------------|-----------------------------|
@@ -71,16 +71,16 @@ A Instância recebe inicialmente os argumentos:
 .....
 
 
-## Classes de args customizados
+## Custom arg classes
 
     str_bool_switcher_type(arg)
 
- - É usado pelo argumento --certificate(-pem), alterna dinamicamente entre string, bool.
- - str: Quando for o caminho da pasta do certificado da requisição.
- - bool, True: certificado integrado.
- - bool, False: Sem verificação.
+ - It is used by the --certificate(-pem) argument, dynamically switches between string, bool.
+ - str: When it is the path to the request certificate folder.
+ - bool, True: integrated certificate.
+ - bool, False: No check.
 
-Exemplo de uso: 
+Usage example: 
 
     self.rex  =  self.sess.get('https://....', timeout=10, verify=self.certificate)
 
@@ -88,9 +88,9 @@ Exemplo de uso:
 ---
     tuple_type(arg)
 
- - É usado pelo argumento --protocols(-p), recebe uma lista de protocólos, ex: --protocols 'http', 'socks4'
+ - It is used by the argument --protocols(-p), receives a list of protocols, eg: --protocols 'http', 'socks4'
 
-Exemplo de uso: 
+Usage example: 
 
     for protocol in args.protocols:
 	        print(f'---\nProtocol selected: {protocol}')
