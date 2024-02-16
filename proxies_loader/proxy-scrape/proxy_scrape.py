@@ -6,12 +6,14 @@ import os
 import time
 
 from jinja2 import Template
+from proxy_logger import logger
 from proxy_validator import test_servers
 from proxy_custom_arg_types import str_bool_switcher_type, tuple_type
 
 #pip install -U requests[socks]
 
 requests.adapters.DEFAULT_RETRIES = 1
+
 
 class ProxyReceiver(object):
     def __init__(self, certificate, time_out):
@@ -25,27 +27,27 @@ class ProxyReceiver(object):
             self.rex.raise_for_status()
             self.old_ip = json.loads(self.rex.text)['ip']
             
-            print(f"---\nCurrent IP: {self.old_ip}")
+            logger.info(f"Current IP: {self.old_ip}")
         
         except requests.exceptions.HTTPError as e:
             self.old_ip = '0.0.0.0'
-            print("---\nIP_API failed with status code:", e.response.status_code)
+            logger.error(f"IP_API failed with status code: {e.response.status_code}")
             
         except Exception as e:
             self.old_ip = '0.0.0.0'
-            print(f"---\nIP_API request failed due to error: {e}")
+            logger.error(f"IP_API request failed due to error: {e.args[len(e.args)-1]}")
         
         
     def retrieve_free_proxy_list(self, url, protocol):       
         try:
             new_url = url.render(protocol_value=protocol)
-            print(f'---\nProxy List API URL: {new_url}')
+            logger.info(f'Proxy List API URL: {new_url}')
             
             res = self.sess.get(new_url, timeout=10, verify=self.certificate)                  
             return res.text
                         
         except Exception as e:
-            print(f'---\nRequesting proxy list failed due to error: {e}\n---')
+            logger.error(f'Requesting proxy list failed due to error: {e.args[len(e.args)-1]}')
             return ''
     
     
@@ -64,7 +66,7 @@ class ProxyReceiver(object):
     def write_valid_list(self, content, protocol, out, limit):
         new_content = content.replace(" ", "").split('\r\n')
         
-        print(f"---\nThere were {len(new_content)} occurrences found.")
+        logger.info(f"There were {len(new_content)} occurrences found.")
         
         path = os.path.join(out, 'proxy_db.csv')
         i = 0
@@ -123,7 +125,7 @@ if __name__ == "__main__":
         client = ProxyReceiver(args.certificate, args.time_out)
         
         for protocol in args.protocols:
-            print(f'---\nProtocol selected: {protocol}')
+            logger.info(f'Protocol selected: {protocol}')
             
             content = client.retrieve_free_proxy_list(args.link, protocol)
             client.write_valid_list(content, protocol, args.output_folder, args.limit)
@@ -131,5 +133,4 @@ if __name__ == "__main__":
         client.sess.close()
         
     except KeyboardInterrupt:
-        print("---\nOperation terminated by user.\n---")
-        
+        logger.info("Operation terminated by user.")        

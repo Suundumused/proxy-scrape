@@ -3,6 +3,10 @@ import socket
 import requests
 import urllib3
 
+from proxy_logger import logger
+
+requests.adapters.DEFAULT_RETRIES = 1
+
 def test_servers(protocol, url, sess, certificate, old_ip):    
     proxies = {'http': f'{protocol}://{url}',
                 'https': f'{protocol}://{url}'}
@@ -28,19 +32,19 @@ def test_servers(protocol, url, sess, certificate, old_ip):
         resp.raise_for_status()
         
         if json.loads(resp.text)['ip'] != old_ip:
-            print(f"---\nNew IP found: {json.loads(resp.text)['ip']} using {url}")
+            logger.info(f"New IP found: {json.loads(resp.text)['ip']} using {url}")
             return True 
         else:
-            raise Exception(f"---\nPublic IP isn't new using {url}, skipped.")
+            raise Exception(f"Public IP isn't new using {url} proxy, skipped.")
 
     except requests.exceptions.HTTPError as e:
-        print("---\nRequest failed with status code:", e.response.status_code)
+        logger.error("Request failed with status code:", e.response.status_code)
         return False
     
     except socket.gaierror as e:
-        print(f"---\nCould not resolve hostname due to error: {e}")
+        logger.error(f"Could not resolve hostname due to error: {e.args[len(e.args)-1]}")
         return False     
         
     except Exception as e:
-        print(f'---\nRequest failed due to error: {e}')
+        logger.error(f'Request failed due to error: {e.args[len(e.args)-1]}')
         return False
