@@ -1,0 +1,6 @@
+*__pycache__/
+/.vscode
+/crawlers/elsevier/data
+/crawlers/elsevier/logs
+/crawlers/scihub/data
+/crawlers/data
