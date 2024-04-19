@@ -79,10 +79,8 @@ class ProxyReceiver(object):
             db_file.seek(0)
             already_exists = False
             
-            for index_file, file_row in enumerate(db_reader):
-                if index_file == 0:
-                    continue
-                elif file_row[1].strip() == '': #Se for hostname
+            for file_row in db_reader:
+                if file_row[1].strip() == '': #Se for hostname
                     if row == file_row[0].strip():
                         already_exists = True
                         break        
@@ -125,8 +123,5 @@ if __name__ == "__main__":
 
         except KeyboardInterrupt:
             logger.info("Operation terminated by user.")
-            
-    if isinstance(client, ProxyReceiver):
-        client.sess.close()
             
                 
