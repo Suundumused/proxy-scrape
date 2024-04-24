@@ -80,11 +80,12 @@ class ProxyReceiver(object):
             already_exists = False
             
             for file_row in db_reader:
-                if file_row[1].strip() == '': #Se for hostname
-                    if row == file_row[0].strip():
+                var_file_row = file_row
+                if var_file_row[1].strip() == '': #Se for hostname
+                    if row == var_file_row[0].strip():
                         already_exists = True
                         break        
-                elif row == f'{file_row[0]}:{file_row[1]}'.strip():
+                elif row == f'{var_file_row[0]}:{var_file_row[1]}'.strip():
                     already_exists = True
                     break
                 
@@ -122,6 +123,5 @@ if __name__ == "__main__":
             client.write_valid_list(content, protocol, args.output_folder, args.limit)
 
         except KeyboardInterrupt:
-            logger.info("Operation terminated by user.")
-            
-                
+            logger.info(f"Protocol {protocol} skipped by user.")
+    logger.info("Operation terminated.")
