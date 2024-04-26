@@ -81,11 +81,11 @@ class ProxyReceiver(object):
             
             for file_row in db_reader:
                 var_file_row = file_row
-                if var_file_row[1].strip() == '': #Se for hostname
-                    if row == var_file_row[0].strip():
+                if not var_file_row[1]: #Se for hostname
+                    if row == var_file_row[0]:
                         already_exists = True
                         break        
-                elif row == f'{var_file_row[0]}:{var_file_row[1]}'.strip():
+                elif row == f'{var_file_row[0]}:{var_file_row[1]}':
                     already_exists = True
                     break
                 

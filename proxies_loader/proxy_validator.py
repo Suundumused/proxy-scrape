@@ -1,14 +1,12 @@
 import json
 import socket
-import requests
 import urllib3
 
+from requests import Session, exceptions
 from proxy_logger import logger
 
-requests.adapters.DEFAULT_RETRIES = 0
 
-
-def test_servers(protocol:str, url:str, sess:requests.Session, certificate, old_ip:str) -> bool:    
+def test_servers(protocol:str, url:str, sess:Session, certificate, old_ip:str) -> bool:    
     proxies = {'http': f'{protocol}://{url}',
                 'https': f'{protocol}://{url}'}          
     try:    
@@ -36,7 +34,7 @@ def test_servers(protocol:str, url:str, sess:requests.Session, certificate, old_
         else:
             raise Exception(f"Public IP isn't new using {url} proxy, skipped.")
 
-    except requests.exceptions.HTTPError as e:
+    except exceptions.HTTPError as e:
         logger.error("Request failed with status code:", e.response.status_code)
         return False
     
