@@ -10,10 +10,8 @@ from proxy_logger import logger
 from proxy_validator import test_servers
 from proxy_custom_arg_types import str_bool_switcher_type, tuple_type
 
-#pip install -U requests[socks]
 
 requests.adapters.DEFAULT_RETRIES = 0
-
 
 class ProxyReceiver(object):
     def __init__(self, certificate, time_out:float) -> None:
@@ -23,9 +21,11 @@ class ProxyReceiver(object):
         self.time_out = time_out
         
         try:
-            self.rex = self.sess.get('https://api.ipify.org?format=json', timeout=10, verify=self.certificate) #Recebe IP público atual.
+            #self.rex = self.sess.get('https://api.ipify.org?format=json', timeout=10, verify=self.certificate)
+            self.rex = self.sess.get('https://icanhazip.com/', timeout=10, verify=self.certificate) #Receives current public IP address.
             self.rex.raise_for_status()
-            self.old_ip = json.loads(self.rex.text)['ip']
+            #self.old_ip = json.loads(self.rex.text)['ip']
+            self.old_ip = self.rex.content.decode()
             
             logger.info(f"Current IP: {self.old_ip}")
         
@@ -35,7 +35,7 @@ class ProxyReceiver(object):
             
         except Exception as e:
             self.old_ip = '0.0.0.0'
-            logger.error(f"IP_API request failed due to error: {e.args[-1]}")
+            logger.error(f"IP_API request failed due to error: {repr(e)}")
         
         
     def retrieve_free_proxy_list(self, url:str, protocol:str) -> str:       
@@ -50,7 +50,7 @@ class ProxyReceiver(object):
             quit()
                         
         except Exception as e:
-            logger.error(f'Requesting proxy list failed due to error: {e.args[-1]}')
+            logger.error(f'Requesting proxy list failed due to error: {repr(e)}')
             return ''
     
     
@@ -81,7 +81,7 @@ class ProxyReceiver(object):
             
             for file_row in db_reader:
                 var_file_row = file_row
-                if not var_file_row[1]: #Se for hostname
+                if not var_file_row[1]: #If it's a hostname
                     if row == var_file_row[0]:
                         already_exists = True
                         break        
@@ -95,7 +95,7 @@ class ProxyReceiver(object):
                     try:
                         db_writer.writerow([f'{row.split(":")[0]}', f'{row.split(":")[1]}', protocol])
                     except IndexError:
-                        db_writer.writerow([row, '', protocol]) #Se for hostname
+                        db_writer.writerow([row, '', protocol]) #If it's a hostname
                 time.sleep(self.time_out)
         db_file.close()
 
@@ -103,11 +103,11 @@ class ProxyReceiver(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('-p', '--protocols', type=tuple_type, default=('socks5', 'socks4')) #ex: -p 'http','https'    
-    parser.add_argument('-l', '--limit', type=int, default=3) # -1 sem limite.        
-    parser.add_argument('-url', '--link', type=Template, default=Template('https://api.proxyscrape.com/v2/?request=displayproxies&protocol={{protocol_value}}&timeout=10000&country=all&ssl=all&anonymity=all')) #'https://www.proxy-list.download/api/v1/get?type={{protocol_value}}&anon=elite&country=US'
-    parser.add_argument('-pem', '--certificate', type=str_bool_switcher_type, default=True) #Caminho do arquivo certificado ssl.pem
-    parser.add_argument('-to', '--time_out', type=float, default=0.33)
+    parser.add_argument('-p', '--protocols', type=tuple_type, default=('socks5', 'socks4')) #eg: -p 'http','https'    
+    parser.add_argument('-l', '--limit', type=int, default=3) # -1 no limit.        
+    parser.add_argument('-url', '--link', type=Template, default=Template('https://www.proxy-list.download/api/v1/get?type={{protocol_value}}&anon=elite&country=US')) #https://api.proxyscrape.com/v2/?request=displayproxies&protocol={{protocol_value}}&timeout=10000&country=all&ssl=all&anonymity=all
+    parser.add_argument('-pem', '--certificate', type=str_bool_switcher_type, default=True) #Path to the ssl.pem certificate file
+    parser.add_argument('-to', '--time_out', type=float, default=0.5)
     parser.add_argument('-out', '--output_folder', type=str, required=True)
 
     args = parser.parse_args()

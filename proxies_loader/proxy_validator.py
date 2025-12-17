@@ -6,10 +6,12 @@ from requests import Session, exceptions
 from proxy_logger import logger
 
 
-def test_servers(protocol:str, url:str, sess:Session, certificate, old_ip:str) -> bool:    
+def test_servers(protocol:str, url:str, sess:Session, certificate, old_ip:str) -> bool:
+    protocol = protocol.replace('https', 'http')
+    
     proxies = {'http': f'{protocol}://{url}',
-                'https': f'{protocol}://{url}'}          
-    try:    
+                'https': f'{protocol}://{url}'}
+    try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(3)
         try:
@@ -24,13 +26,17 @@ def test_servers(protocol:str, url:str, sess:Session, certificate, old_ip:str) -
         finally:
             sock.connect((IP, PORT))
             sock.close()
-                        
-        resp = sess.get('https://api.ipify.org?format=json', proxies=proxies, timeout=5, verify=certificate) #Testa receber novo IP público de api.my-ip.io com a proxy selecionada.
+
+        #resp = sess.get('https://api.ipify.org?format=json', proxies=proxies, timeout=5, verify=certificate) #Testa receber novo IP público de api.my-ip.io com a proxy selecionada.
+        resp = sess.get('https://icanhazip.com/', proxies=proxies, timeout=5, verify=certificate)
         resp.raise_for_status()
         
-        if json.loads(resp.text)['ip'] != old_ip:
-            logger.info(f"New IP found: {json.loads(resp.text)['ip']} using {url}")
-            return True 
+        new_ip = resp.content.decode()
+        #new_ip = json.loads(resp.text)['ip']
+        
+        if new_ip != old_ip:
+            logger.info(f"New IP found: {new_ip} using {url}")
+            return True
         else:
             raise Exception(f"Public IP isn't new using {url} proxy, skipped.")
 
@@ -39,9 +45,9 @@ def test_servers(protocol:str, url:str, sess:Session, certificate, old_ip:str) -
         return False
     
     except socket.gaierror as e:
-        logger.error(f"Could not resolve hostname due to error: {e.args[-1]}")
+        logger.error(f"Could not resolve hostname due to error: {repr(e)}")
         return False 
         
     except Exception as e:
-        logger.error(f'Request failed due to error: {e.args[-1]}')
+        logger.error(f'Request failed due to error: {repr(e)}')
         return False
