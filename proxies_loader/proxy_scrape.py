@@ -1,13 +1,12 @@
 import argparse
-import csv
 import json
 import requests
 import os, sys
 import time
 
 from proxy_logger import logger
-from proxy_validator import test_proxy, current_ip
-from initialization_args.custom_arg_types import str_bool_switcher_type, tuple_type
+from proxy_validator import ProxyTester
+from initialization_args.custom_arg_types import str_bool_switcher_type
 
 
 requests.adapters.DEFAULT_RETRIES = 0
@@ -15,27 +14,38 @@ requests.adapters.DEFAULT_RETRIES = 0
 class ProxyReceiver(object):
     def __init__(self, certificate, time_out:float, api_name:str) -> None:
         self.sess = requests.Session()
-        self.sess.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:27.0) Gecko/20100101 Firefox/27.0'})
+        
+        if type(certificate) is bool:
+            self.sess.verify = certificate
+        else:
+            self.sess.cert = certificate
+            
+        self.sess.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
+        
+        self.proxy_tester = ProxyTester(self.sess)
+        
         self.api_name = api_name
-        self.certificate = certificate
         self.time_out = time_out
-        self.old_ip = current_ip(self.sess, self.certificate)
         
         
-    def retrieve_free_proxy_list(self) -> str:       
+    def retrieve_free_proxy_list(self) -> list[dict]:       
         try:
             match self.api_name:
                 case 'geonode':
                     from proxy_list_api_modules.geonode import GeonodeClasss as ProxyListApi
-                    self.api_class = ProxyListApi()
+                    
+                case 'roundproxies':
+                    from proxy_list_api_modules.roundproxies import RoundProxiesClasss as ProxyListApi
+                    
+            self.api_class = ProxyListApi()
                 
             new_url = self.api_class.build_schema_url(self.get_current_directory(
-                    os.path.join('schemas', 'proxy_list_api', self.api_name + '_api', self.api_name + '.json')
+                    os.path.join('schemas', 'proxy_providers_config', self.api_name + '.json')
                 )
             )
             logger.info(f'Proxy List API URL: {new_url}')
             
-            return self.api_class.build_schema_response(self.sess.get(new_url, timeout=10, verify=self.certificate))
+            return self.api_class.build_schema_response(self.sess.get(new_url, timeout=10))
         
         except KeyboardInterrupt:
             quit()
@@ -45,24 +55,34 @@ class ProxyReceiver(object):
             return ''
     
     
+    def open_file(self, path:str):
+        try:
+            return self.file_mode(path, 'r+')
+        except FileNotFoundError:
+            return self.file_mode(path, 'w+')
+    
+    
     @staticmethod
-    def open_file(path:str):
-        return open(os.path.join(path, 'Proxy List.json'), 'w+', encoding="utf-8")
+    def file_mode(path, mode:str):
+        return open(os.path.join(path, 'Proxy List.json'), mode, encoding="utf-8")
     
     
     @staticmethod
     def write_file(file, data:dict) -> None:
+        file.seek(0, 0)
         json.dump(data, file, indent=4)
+        file.truncate()
     
     
     def write_valid_list(self, new_content:list[dict], out:str, limit:int):
-        logger.info(f"There are {len(new_content)} occurrences found.")
+        len_new_content = len(new_content)
+        logger.info(f"There are {len_new_content} occurrences found.")
         
         file = self.open_file(out)        
         try:
             current_content = json.load(file)
-            current_content['protocolsCount'] = {}
-        except:
+            
+        except json.JSONDecodeError:
             current_content = {
                 'protocolsCount': {},
                 'proxies': []
@@ -71,42 +91,52 @@ class ProxyReceiver(object):
         def test(server:dict, protocol:str) -> bool:            
             ip = server['ip']
             port = server['port']
-            
             logger.info(f'Testing {ip}:{port} with protocol {protocol}')
             
-            return test_proxy(ip, port, protocol, self.sess, self.certificate, self.old_ip)
+            return self.proxy_tester.test_proxy(ip, port, protocol)
+        
+        def subtract_new_content(index:int) -> None:
+            nonlocal len_new_content
+            len_new_content-=1
+            
+            new_content.pop(index)
         
         index = 0
-        while index < len(new_content):    
-            server = self.api_class.fix_data(new_content[index])
-            protocol = server['protocol']
+        while index < len_new_content:
+            try:
+                server = self.api_class.fix_data(new_content[index])
+            except:
+                subtract_new_content(index)
+                logger.error('Invalid data, skipped.')
+                continue
             
+            protocol = server['protocol']
             try:                
-                if current_content['protocolsCount'][protocol] > limit:
+                if current_content['protocolsCount'][protocol] == limit:
+                    subtract_new_content(index)
                     continue
                 
                 if test(server, protocol):
-                    current_content['protocolsCount'][protocol] +=1
                     self.api_class.confirm(server)
-                    
+                    current_content['protocolsCount'][protocol] +=1
                     index += 1
+                    
+                    time.sleep(self.time_out)
                     continue
                             
             except KeyError:
                 if test(server, protocol):
-                    current_content['protocolsCount'][protocol] = 1
                     self.api_class.confirm(server)
-                    
+                    current_content['protocolsCount'][protocol] = 1
                     index += 1
+                    
+                    time.sleep(self.time_out)
                     continue
             
-            new_content.pop(index)
+            subtract_new_content(index)
             time.sleep(self.time_out)
             
-        print(current_content['protocolsCount'])
-        del current_content['protocolsCount']
         current_content['proxies'].extend(new_content)
-        
         self.write_file(file, current_content)
             
  
@@ -128,7 +158,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    client = ProxyReceiver(args.certificate, args.time_out, args.api_name)
+    client = ProxyReceiver(args.certificate, args.time_out, args.api_name.lower().replace(' ', ''))
     try:
         client.write_valid_list(client.retrieve_free_proxy_list(), args.output_folder, args.limit)
 

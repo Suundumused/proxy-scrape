@@ -1,0 +1,11 @@
+{
+    "uri": "https://roundproxies.com/api/get-free-proxies/?",
+    "inputParams": {
+        "protocols": ["socks5", "socks4", "https"],
+        "filterUpTime": 100,
+        "limit": 100,
+        "page": 1,
+        "sort_by": "lastChecked",
+        "sort_type": "desc"
+    }
+}

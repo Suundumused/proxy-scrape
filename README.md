@@ -1,107 +1,110 @@
 ﻿# Proxy Scrape
-Project to receive, validate and store a list of free proxies.
+**Project to receive, test, validate and store a list of free proxies.**
 
-# Installation
- - `pip install -r .../Requirements.txt`
+## Installation
+    pip install -r ./requirements.txt
 
-# Requirements
+## Requirements
  - argparse
- - urllib3 
- - requests
- - jinja2 
+ - urllib3
  - requests[socks]
- - --
- - proxies_validator.py
- - custom_arg_types.py
 
 ## Usage 
-These initial lines are required in proxy_scrape.py for basic functionality.
+On `proxy_validator.py` Switch between providers available in `\ip_checker_provider_modules`. Those responsible for testing the proxy and the new masked IP address. The script for each schema always returns in string format, compatible with the program.
 
-    import argparse
-    import csv
-    import json
-    import requests
-    import os
-    import time
-    
-    from jinja2 import Template
-    from proxies_validator import test_servers
-    from custom_arg_types import str_bool_switcher_type, tuple_type
+    from ip_checker_provider_modules.ipify import get_public_ip
+
 ----
+
+On `\proxy_list_api_modules` you can add or edit the scripts for the Free Proxy List provider schemas. The configuration for each corresponding provider module is in the `schemas\proxy_providers_config` folder. All must return a list of dictionaries in the same format compatible with the rest of the program. Eg:.
+
+    {
+        "data": [
+            {
+                "_id": "xxxx",
+                "ip": "xxx.xxx.xxx.xxx",
+                "city": "Busan",
+                "country": "KR",
+                "lastChecked": 1766169816,
+                "latency": 219.011,
+                "port": "9400",
+                "protocols": [
+                    "socks4"
+                ]
+            },
+            {
+                "_id": "xxxx",
+                "ip": "xxx.xxx.xxx.xxx",
+                "city": "Khon Kaen",
+                "country": "TH",
+                "lastChecked": 1766169816,
+                "latency": 236.013,
+                "port": "8080",
+                "protocols": [
+                    "socks4"
+                ]
+            },
+            ...
+        ]
+    }
+
 The Instance initially receives the arguments:
 
- - `-pem` Certificate file path file.pem
- - `-to` Time interval for testing each proxy server.
----
+ - `-c` Certificate file path `certificate.pem`. This can also be set to 'True' or 'False' to use a generic certificate or disable it.
+ - `-t` Time interval for testing each proxy server.
 
-    client = ProxyReceiver(args.certificate, args.time_out)
-
-## Overall arguments
-
- - `-p` Receives a tuple of desired protocols for proxy server search eg: --protocols 'https', 'socks5'
+## Overall Arguments
+ - `-a` Name of the API provider from the list of free proxies. This should be an available option in `\proxy_list_api_modules`
  - `-l` Limit of tested and valid proxies per protocol.
- - `-url` API URL that will have the list of IP:PORT proxy servers, the {{protocol_value}} parameter is mandatory after the protocol= variable or any protocol type reference variable.
- - `-out` It is the output folder that will have the csv file with the tested proxy list.
+ - `-o` It is the output folder that will have the json file with the tested proxy list.
 
-## Functions
+## Some Functions
 
-    content = client.retrieve_free_proxy_list(args.link, protocol)
+    retrieve_free_proxy_list(args.link, protocol)
     
-
- - Receives the list of API-URL proxy servers with all protocols selected in string.
+ - Receives the list of API-URL proxy servers with all protocols selected in a json.
 
 ---
+    write_valid_list(content, protocol, args.output_folder, args.limit)
 
-    client.write_valid_list(content, protocol, args.output_folder, args.limit)
-
- - Test, validate (test_servers(...)) and save the ip:port and protocol in a csv file.
+ - Test, validate (test_servers(...)) and save the ip:port and protocol in a json file.
  ---
 
     test_servers(protocol, row, self.sess, self.certificate, self.old_ip)
      
  - Individual function that tests the connection to the server and validates IP filtering.
 
+## Json Structure
 
-## csv structure
+    {
+        "protocolsCount": {
+            "socks5": 1,
+            "socks4": 1
+        },
+        "proxies": [
+            {
+                "ip": "xxx.xxx.xxx.xxx",
+                "port": "20000",
+                "country": "RU",
+                "latency": 44.981,
+                "protocol": "socks5"
+            },
+            {
+                "ip": "xxx.xxx.xxx.xxx",
+                "port": "60111",
+                "country": "FR",
+                "latency": 9.506,
+                "protocol": "socks4"
+            }
+        ]
+    }
 
-|    url          |port                          |protocol                         |
-|----------------|-------------------------------|-----------------------------|
-|123.456.78.90   |1234                           |socks5                       |
-|098.765.43.21   |4321                           |https                        |
-.....
 
-
-## Custom arg classes
+## Custom arg Classes
 
     str_bool_switcher_type(arg)
 
- - It is used by the --certificate(-pem) argument, dynamically switches between string, bool.
+ - It is used by the --certificate(-c) argument, dynamically switches between string, bool.
  - str: When it is the path to the request certificate folder.
  - bool, True: integrated certificate.
  - bool, False: No check.
-
-Usage example: 
-
-    self.rex  =  self.sess.get('https://....', timeout=10, verify=self.certificate)
-
-
----
-    tuple_type(arg)
-
- - It is used by the argument --protocols(-p), receives a list of protocols, eg: --protocols 'http', 'socks4'
-
-Usage example: 
-
-    for protocol in args.protocols:
-	        print(f'---\nProtocol selected: {protocol}')
-         
-    	content = client.retrieve_free_proxy_list(args.link, protocol)
-    	client.write_valid_list(content, protocol, args.output_folder, args.limit)
-
----
-
-    proxies = {'http': f'{protocol}://{url}',
-                    'https': f'{protocol}://{url}'}
----
-
-    resp = self.sess.get('https://....', timeout=5, proxies=proxies, verify=self.certificate)

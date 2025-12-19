@@ -4,7 +4,7 @@ from requests import Response
 
 UNNEEDED_KEYS = ('_id', 'anonymityLevel', 'asn', 'region', 'created_at', 'google', 'isp', 'lastChecked')
 
-class GeonodeClasss(object):
+class RoundProxiesClasss(object):
     def build_schema_url(self, settings_path:str) -> str:
         with open(settings_path, 'r') as data:
             data = load(data)

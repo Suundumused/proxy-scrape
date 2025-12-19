@@ -1,7 +1,7 @@
 {
     "uri": "https://proxylist.geonode.com/api/proxy-list?",
     "inputParams": {
-        "protocols": ["socks5"],
+        "protocols": ["socks5", "socks4", "https"],
         "filterUpTime": 100,
         "limit": 100,
         "page": 1,
