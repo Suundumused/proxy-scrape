@@ -1,41 +1,47 @@
-import json
 import socket
 import urllib3
 
 from requests import Session, exceptions
+from schemas.check_public_ip.ipify import get_public_ip
 from proxy_logger import logger
 
 
-def test_servers(protocol:str, url:str, sess:Session, certificate, old_ip:str) -> bool:
-    protocol = protocol.replace('https', 'http')
-    
-    proxies = {'http': f'{protocol}://{url}',
-                'https': f'{protocol}://{url}'}
+def current_ip(sess:Session, certificate):
+    return get_public_ip(sess, certificate)
+
+
+def test_proxy(ip:str, port, protocol:str, sess:Session, certificate, old_ip:str) -> bool:
+    url = ip + ':' + port
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(3)
-        try:
-            IP, PORT = url.split(":")[0], int(url.split(":")[1])
             
-        except IndexError:
-            parsed_url = urllib3.parse.urlparse(url)
-            hostname = parsed_url.hostname
-            
-            IP = socket.gethostbyname(hostname) #Se for hostname
-            PORT = parsed_url.port            
-        finally:
-            sock.connect((IP, PORT))
-            sock.close()
-
-        #resp = sess.get('https://api.ipify.org?format=json', proxies=proxies, timeout=5, verify=certificate) #Testa receber novo IP público de api.my-ip.io com a proxy selecionada.
-        resp = sess.get('https://icanhazip.com/', proxies=proxies, timeout=5, verify=certificate)
-        resp.raise_for_status()
+        #parsed_url = urllib3.parse.urlparse(url)
+        #hostname = parsed_url.hostname
         
-        new_ip = resp.content.decode()
-        #new_ip = json.loads(resp.text)['ip']
+        #IP = socket.gethostbyname(hostname) #Se for hostname
+        #PORT = parsed_url.port            
+        sock.connect((ip, int(port)))
+        sock.close()
+        
+        scheme = (
+            protocol + 'a' if protocol == 'socks4' else
+            protocol + 'h' if protocol == 'socks5' else
+            protocol.replace('https', 'http')
+        )
+        
+        new_ip = get_public_ip(
+            sess, 
+            certificate,
+            {
+                'http': f'{scheme}://{url}',
+                'https': f'{scheme}://{url}'
+            }
+        )
         
         if new_ip != old_ip:
             logger.info(f"New IP found: {new_ip} using {url}")
+            
             return True
         else:
             raise Exception(f"Public IP isn't new using {url} proxy, skipped.")

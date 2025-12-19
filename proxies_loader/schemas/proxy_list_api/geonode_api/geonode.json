@@ -1,0 +1,11 @@
+{
+    "uri": "https://proxylist.geonode.com/api/proxy-list?",
+    "inputParams": {
+        "protocols": ["socks5"],
+        "filterUpTime": 100,
+        "limit": 100,
+        "page": 1,
+        "sort_by": "lastChecked",
+        "sort_type": "desc"
+    }
+}

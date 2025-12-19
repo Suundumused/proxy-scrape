@@ -2,49 +2,40 @@ import argparse
 import csv
 import json
 import requests
-import os
+import os, sys
 import time
 
-from jinja2 import Template
 from proxy_logger import logger
-from proxy_validator import test_servers
-from proxy_custom_arg_types import str_bool_switcher_type, tuple_type
+from proxy_validator import test_proxy, current_ip
+from initialization_args.custom_arg_types import str_bool_switcher_type, tuple_type
 
 
 requests.adapters.DEFAULT_RETRIES = 0
 
 class ProxyReceiver(object):
-    def __init__(self, certificate, time_out:float) -> None:
+    def __init__(self, certificate, time_out:float, api_name:str) -> None:
         self.sess = requests.Session()
         self.sess.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:27.0) Gecko/20100101 Firefox/27.0'})
+        self.api_name = api_name
         self.certificate = certificate
         self.time_out = time_out
+        self.old_ip = current_ip(self.sess, self.certificate)
         
+        
+    def retrieve_free_proxy_list(self) -> str:       
         try:
-            #self.rex = self.sess.get('https://api.ipify.org?format=json', timeout=10, verify=self.certificate)
-            self.rex = self.sess.get('https://icanhazip.com/', timeout=10, verify=self.certificate) #Receives current public IP address.
-            self.rex.raise_for_status()
-            #self.old_ip = json.loads(self.rex.text)['ip']
-            self.old_ip = self.rex.content.decode()
-            
-            logger.info(f"Current IP: {self.old_ip}")
-        
-        except requests.exceptions.HTTPError as e:
-            self.old_ip = '0.0.0.0'
-            logger.error(f"IP_API failed with status code: {e.response.status_code}")
-            
-        except Exception as e:
-            self.old_ip = '0.0.0.0'
-            logger.error(f"IP_API request failed due to error: {repr(e)}")
-        
-        
-    def retrieve_free_proxy_list(self, url:str, protocol:str) -> str:       
-        try:
-            new_url = url.render(protocol_value=protocol)
+            match self.api_name:
+                case 'geonode':
+                    from proxy_list_api_modules.geonode import GeonodeClasss as ProxyListApi
+                    self.api_class = ProxyListApi()
+                
+            new_url = self.api_class.build_schema_url(self.get_current_directory(
+                    os.path.join('schemas', 'proxy_list_api', self.api_name + '_api', self.api_name + '.json')
+                )
+            )
             logger.info(f'Proxy List API URL: {new_url}')
             
-            res = self.sess.get(new_url, timeout=10, verify=self.certificate)                  
-            return res.text
+            return self.api_class.build_schema_response(self.sess.get(new_url, timeout=10, verify=self.certificate))
         
         except KeyboardInterrupt:
             quit()
@@ -54,74 +45,93 @@ class ProxyReceiver(object):
             return ''
     
     
-    def open_file(self, path:str):
-        db_file = open(path, 'a+', newline='', encoding="utf-8")
-        db_writer = csv.writer(db_file, delimiter=";", dialect='excel', lineterminator="\r\n")    
-        db_reader = csv.reader(db_file, delimiter=";", dialect='excel', lineterminator="\r\n")
-        db_file.seek(0)
-        
-        if next(db_reader, None) is None:
-            db_writer.writerow(['url', 'port', 'protocol'])
-                    
-        return db_file, db_writer, db_reader
+    @staticmethod
+    def open_file(path:str):
+        return open(os.path.join(path, 'Proxy List.json'), 'w+', encoding="utf-8")
     
     
-    def write_valid_list(self, content:str, protocol:str, out:str, limit:int):
-        new_content = content.replace(" ", "").split('\r\n')
-        logger.info(f"There were {len(new_content)} occurrences found.")
+    @staticmethod
+    def write_file(file, data:dict) -> None:
+        json.dump(data, file, indent=4)
+    
+    
+    def write_valid_list(self, new_content:list[dict], out:str, limit:int):
+        logger.info(f"There are {len(new_content)} occurrences found.")
         
-        path = os.path.join(out, 'proxy_db.csv')        
-        db_file, db_writer, db_reader = self.open_file(path)
-        len_new_content = len(new_content)
+        file = self.open_file(out)        
+        try:
+            current_content = json.load(file)
+            current_content['protocolsCount'] = {}
+        except:
+            current_content = {
+                'protocolsCount': {},
+                'proxies': []
+            }
         
-        for index in range(0, len_new_content-limit if 0 < limit < len_new_content else len_new_content):
-            row = new_content[index]
-            db_file.seek(0)
-            already_exists = False
+        def test(server:dict, protocol:str) -> bool:            
+            ip = server['ip']
+            port = server['port']
             
-            for file_row in db_reader:
-                var_file_row = file_row
-                if not var_file_row[1]: #If it's a hostname
-                    if row == var_file_row[0]:
-                        already_exists = True
-                        break        
-                elif row == f'{var_file_row[0]}:{var_file_row[1]}':
-                    already_exists = True
-                    break
+            logger.info(f'Testing {ip}:{port} with protocol {protocol}')
+            
+            return test_proxy(ip, port, protocol, self.sess, self.certificate, self.old_ip)
+        
+        index = 0
+        while index < len(new_content):    
+            server = self.api_class.fix_data(new_content[index])
+            protocol = server['protocol']
+            
+            try:                
+                if current_content['protocolsCount'][protocol] > limit:
+                    continue
                 
-            if not already_exists:
-                if test_servers(protocol, row, self.sess, self.certificate, self.old_ip):
-                    db_file.seek(0, 2)  
-                    try:
-                        db_writer.writerow([f'{row.split(":")[0]}', f'{row.split(":")[1]}', protocol])
-                    except IndexError:
-                        db_writer.writerow([row, '', protocol]) #If it's a hostname
-                time.sleep(self.time_out)
-        db_file.close()
+                if test(server, protocol):
+                    current_content['protocolsCount'][protocol] +=1
+                    self.api_class.confirm(server)
+                    
+                    index += 1
+                    continue
+                            
+            except KeyError:
+                if test(server, protocol):
+                    current_content['protocolsCount'][protocol] = 1
+                    self.api_class.confirm(server)
+                    
+                    index += 1
+                    continue
+            
+            new_content.pop(index)
+            time.sleep(self.time_out)
+            
+        print(current_content['protocolsCount'])
+        del current_content['protocolsCount']
+        current_content['proxies'].extend(new_content)
+        
+        self.write_file(file, current_content)
+            
+ 
+    @staticmethod
+    def get_current_directory(path:str = None):
+        newpath = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(sys.argv[0]))
 
+        return os.path.join(newpath, path) if path else newpath
+      
       
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('-p', '--protocols', type=tuple_type, default=('socks5', 'socks4')) #eg: -p 'http','https'    
     parser.add_argument('-l', '--limit', type=int, default=3) # -1 no limit.        
-    parser.add_argument('-url', '--link', type=Template, default=Template('https://www.proxy-list.download/api/v1/get?type={{protocol_value}}&anon=elite&country=US')) #https://api.proxyscrape.com/v2/?request=displayproxies&protocol={{protocol_value}}&timeout=10000&country=all&ssl=all&anonymity=all
-    parser.add_argument('-pem', '--certificate', type=str_bool_switcher_type, default=True) #Path to the ssl.pem certificate file
-    parser.add_argument('-to', '--time_out', type=float, default=0.5)
-    parser.add_argument('-out', '--output_folder', type=str, required=True)
+    parser.add_argument('-a', '--api_name', type=str, default='geonode')
+    parser.add_argument('-c', '--certificate', type=str_bool_switcher_type, default=True) #Path to the ssl.pem certificate file
+    parser.add_argument('-t', '--time_out', type=float, default=0.5)
+    parser.add_argument('-o', '--output_folder', type=str, required=True)
 
     args = parser.parse_args()
     
-    protocol:str = None
-    content:str = None
-    client = ProxyReceiver(args.certificate, args.time_out)
-        
-    for protocol in args.protocols:
-        logger.info(f'Protocol selected: {protocol}')
-        try:
-            content = client.retrieve_free_proxy_list(args.link, protocol)
-            client.write_valid_list(content, protocol, args.output_folder, args.limit)
+    client = ProxyReceiver(args.certificate, args.time_out, args.api_name)
+    try:
+        client.write_valid_list(client.retrieve_free_proxy_list(), args.output_folder, args.limit)
 
-        except KeyboardInterrupt:
-            logger.info(f"Protocol {protocol} skipped by user.")
+    except KeyboardInterrupt:
+        pass
     logger.info("Operation terminated.")
