@@ -2,15 +2,23 @@ import socket
 import urllib3
 
 from requests import Session, exceptions
-from ip_checker_provider_modules.ipify import get_public_ip
 from proxy_logger import logger
 
 
 class ProxyTester(object):
-    def __init__(self, sess:Session) -> None:
-        self.sess = sess
-        self.old_ip = get_public_ip(self.sess)
-
+    def __init__(self, sess:Session, test_provider:str) -> None:                
+        match test_provider:
+            case 'ipify':
+                from ip_checker_provider_modules.ipify import IpifyProvider as TestProvider
+                
+            case 'icanhazip':
+                from ip_checker_provider_modules.icanhazip import IcanhazipProvider as TestProvider
+        
+        self.test_provider_instance = TestProvider(sess)
+        self.old_ip = self.test_provider_instance.get_public_ip()
+        
+        logger.info(f'Selected Test Provider: {test_provider}')
+        
 
     def test_proxy(self, ip:str, port, protocol:str) -> bool:
         url = ip + ':' + port
@@ -32,8 +40,7 @@ class ProxyTester(object):
                 protocol.replace('https', 'http')
             )
 
-            new_ip = get_public_ip(
-                self.sess, 
+            new_ip = self.test_provider_instance.get_public_ip(
                 {
                     'http': f'{scheme}://{url}',
                     'https': f'{scheme}://{url}'

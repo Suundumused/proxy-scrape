@@ -54,7 +54,8 @@ The Instance initially receives the arguments:
  - `-t` Time interval for testing each proxy server.
 
 ## Overall Arguments
- - `-a` Name of the API provider from the list of free proxies. This should be an available option in `\proxy_list_api_modules`
+ - `-a` Name of the API provider from the list of free proxies. This should be an available option in `\proxy_list_api_modules`.
+ - `-i` Select the API that will obtain the public IP. It must be one of the options available in `\ip_checker_provider_modules`.
  - `-l` Limit of tested and valid proxies per protocol.
  - `-o` It is the output folder that will have the json file with the tested proxy list.
 

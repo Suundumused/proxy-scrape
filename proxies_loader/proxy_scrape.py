@@ -12,18 +12,17 @@ from initialization_args.custom_arg_types import str_bool_switcher_type
 requests.adapters.DEFAULT_RETRIES = 0
 
 class ProxyReceiver(object):
-    def __init__(self, certificate, time_out:float, api_name:str) -> None:
+    def __init__(self, certificate, time_out:float, api_name:str, test_provider:str) -> None:
         self.sess = requests.Session()
         
         if type(certificate) is bool:
             self.sess.verify = certificate
         else:
             self.sess.cert = certificate
-            
         self.sess.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
         
-        self.proxy_tester = ProxyTester(self.sess)
-        
+        self.proxy_tester = ProxyTester(self.sess, test_provider)
+
         self.api_name = api_name
         self.time_out = time_out
         
@@ -46,13 +45,10 @@ class ProxyReceiver(object):
             logger.info(f'Proxy List API URL: {new_url}')
             
             return self.api_class.build_schema_response(self.sess.get(new_url, timeout=10))
-        
-        except KeyboardInterrupt:
-            quit()
                         
         except Exception as e:
             logger.error(f'Requesting proxy list failed due to error: {repr(e)}')
-            return ''
+            return []
     
     
     def open_file(self, path:str):
@@ -152,13 +148,19 @@ if __name__ == "__main__":
     
     parser.add_argument('-l', '--limit', type=int, default=3) # -1 no limit.        
     parser.add_argument('-a', '--api_name', type=str, default='geonode')
+    parser.add_argument('-i', '--test_provider', type=str, default='ipify')
     parser.add_argument('-c', '--certificate', type=str_bool_switcher_type, default=True) #Path to the ssl.pem certificate file
     parser.add_argument('-t', '--time_out', type=float, default=0.5)
     parser.add_argument('-o', '--output_folder', type=str, required=True)
 
     args = parser.parse_args()
     
-    client = ProxyReceiver(args.certificate, args.time_out, args.api_name.lower().replace(' ', ''))
+    client = ProxyReceiver(
+        args.certificate, 
+        args.time_out,
+        args.api_name.lower().replace(' ', ''), 
+        args.test_provider.lower().replace(' ', '')
+    )
     try:
         client.write_valid_list(client.retrieve_free_proxy_list(), args.output_folder, args.limit)
 
