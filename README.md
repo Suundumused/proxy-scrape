@@ -1,4 +1,4 @@
-﻿# Proxy Scrape
+﻿# Proxy Scraping
 **Project to receive, test, validate and store a list of free proxies.**
 
 ## Installation
